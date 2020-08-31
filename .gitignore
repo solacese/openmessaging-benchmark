@@ -18,3 +18,4 @@ core/*.json
 # IntelliJ artifacts
 .idea/
 *.iml
+driver-kafka/deploy/provision-kafka-aws.tf
