@@ -1,4 +1,3 @@
-public_key_path = "c:\\dev\\terraform\\kafka-benchmark-key.ppk"
 region          = "us-west-2"
 ami             = "ami-9fa343e7" // RHEL-7.4
 profile         = "default"
