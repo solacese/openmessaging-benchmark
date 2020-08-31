@@ -17,55 +17,55 @@
 # under the License.
 #
 
-- name: Collect profiles
-  hosts: kafka, client
-  become: true
-  tags:
-    - profile
-  tasks:
-    - set_fact:
-        time: "{{ ansible_date_time.epoch }}"
-    - name: Generate Flame graph
-      tags:
-        - flame
-      shell: |
-        /tmp/profiler.sh -d 120 `pidof java` -f /tmp/flame.svg
-    - name: Fetch flame graph
-      tags:
-        - flame
-      fetch:
-        src: /tmp/flame.svg
-        dest: results/{{ group_names[0] }}/{{ time }}/{{ inventory_hostname }}/flame.svg
-        flat: yes
-
-    # - name: Dump & compress heap
-    #   tags:
-    #     - heap
-    #   shell: |
-    #     jattach `pidof java` dumpheap /tmp/heap
-    #     chmod 777 /tmp/heap
-    #     tar -cvzf /tmp/heap.tar /tmp/heap
-    # - name: Fetch heap dump
-    #   tags:
-    #     - heap
-    #   fetch:
-    #     src: /tmp/heap.tar
-    #     dest: results/{{ group_names[0] }}/{{ time }}/{{ inventory_hostname }}/heap.tar
-    #     flat: yes
-
-    - name: Heap allocation profile
-      tags:
-        - heap
-      shell: |
-        /tmp/profiler.sh -d 60 -e alloc -o svg -f /tmp/heap.svg 1 `pidof java`
-        chmod 777 /tmp/heap.svg
-    - name: Fetch heap dump
-      tags:
-        - heap
-      fetch:
-        src: /tmp/heap.svg
-        dest: results/{{ group_names[0] }}/{{ time }}/{{ inventory_hostname }}/heap.svg
-        flat: yes
+#- name: Collect profiles
+#  hosts: kafka, client
+#  become: true
+#  tags:
+#    - profile
+#  tasks:
+#    - set_fact:
+#        time: "{{ ansible_date_time.epoch }}"
+#    - name: Generate Flame graph
+#      tags:
+#        - flame
+#      shell: |
+#        /tmp/profiler.sh -d 120 `pidof java` -f /tmp/flame.svg
+#    - name: Fetch flame graph
+#      tags:
+#        - flame
+#      fetch:
+#        src: /tmp/flame.svg
+#        dest: results/{{ group_names[0] }}/{{ time }}/{{ inventory_hostname }}/flame.svg
+#        flat: yes
+#
+#    # - name: Dump & compress heap
+#    #   tags:
+#    #     - heap
+#    #   shell: |
+#    #     jattach `pidof java` dumpheap /tmp/heap
+#    #     chmod 777 /tmp/heap
+#    #     tar -cvzf /tmp/heap.tar /tmp/heap
+#    # - name: Fetch heap dump
+#    #   tags:
+#    #     - heap
+#    #   fetch:
+#    #     src: /tmp/heap.tar
+#    #     dest: results/{{ group_names[0] }}/{{ time }}/{{ inventory_hostname }}/heap.tar
+#    #     flat: yes
+#
+#    - name: Heap allocation profile
+#      tags:
+#        - heap
+#      shell: |
+#        /tmp/profiler.sh -d 60 -e alloc -o svg -f /tmp/heap.svg 1 `pidof java`
+#        chmod 777 /tmp/heap.svg
+#    - name: Fetch heap dump
+#      tags:
+#        - heap
+#      fetch:
+#        src: /tmp/heap.svg
+#        dest: results/{{ group_names[0] }}/{{ time }}/{{ inventory_hostname }}/heap.svg
+#        flat: yes
 
 - name: Format and mount disks for Kafka hosts
   hosts: kafka
@@ -119,6 +119,7 @@
         - chrony
         - git
         - gcc
+        - dos2unix
 
 - name: Kafka installation
   hosts: kafka, zookeeper
@@ -248,6 +249,8 @@
         name: "chronyd"
 
 - name: Setup Benchmark client
+  tags:
+    - benchmark
   hosts: client
   connection: ssh
   become: true
@@ -259,6 +262,8 @@
         dest: /opt
     - shell: mv /opt/openmessaging-benchmark-0.0.1-SNAPSHOT /opt/benchmark
     - shell: tuned-adm profile latency-performance
+    - shell: sudo dos2unix /opt/benchmark/bin/benchmark.sh && sudo dos2unix /opt/benchmark/bin/benchmark-worker.sh && sudo chmod +x /opt/benchmark/bin/benchmark.sh && sudo chmod +x /opt/benchmark/bin/benchmark-worker.sh
+
 
     - name: Get list of driver config files
       raw: ls -1 /opt/benchmark/driver-kafka/*.yaml
@@ -272,12 +277,12 @@
       with_items: "{{ drivers_list.stdout_lines }}"
     - name: Configure memory
       lineinfile:
-        dest: /opt/benchmark/bin/benchmark-worker
+        dest: /opt/benchmark/bin/benchmark-worker.sh
         regexp: "^JVM_MEM="
         line: 'JVM_MEM="-Xms16G -Xmx16G -XX:+UseG1GC -XX:MaxGCPauseMillis=10 -XX:+ParallelRefProcEnabled -XX:+UnlockExperimentalVMOptions -XX:+AggressiveOpts -XX:+DoEscapeAnalysis -XX:ParallelGCThreads=32 -XX:ConcGCThreads=32 -XX:G1NewSizePercent=50 -XX:+DisableExplicitGC -XX:-ResizePLAB -XX:+PerfDisableSharedMem -XX:+AlwaysPreTouch -XX:-UseBiasedLocking"'
     - name: Configure memory
       lineinfile:
-        dest: /opt/benchmark/bin/benchmark
+        dest: /opt/benchmark/bin/benchmark.sh
         regexp: "^JVM_MEM="
         line: 'JVM_MEM="-Xmx1G"'
     - name: Setup JMX for Producer/Consumer clients
