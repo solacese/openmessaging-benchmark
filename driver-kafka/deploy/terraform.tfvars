@@ -1,7 +1,9 @@
-public_key_path = "~/.ssh/kafka_aws.pub"
+public_key_path = "c:\\dev\\terraform\\kafka-benchmark-key.ppk"
 region          = "us-west-2"
 ami             = "ami-9fa343e7" // RHEL-7.4
 profile         = "default"
+ownerTag = "thomas.kunnumpurath@solace.com"
+daysTag = "5"
 
 instance_types = {
   "kafka"      = "i3en.2xlarge"
@@ -16,3 +18,4 @@ num_instances = {
   "zookeeper"  = 3
   "prometheus" = 1
 }
+
