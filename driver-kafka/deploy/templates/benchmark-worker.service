@@ -3,7 +3,7 @@ Description=Benchmark worker
 After=network.target
 
 [Service]
-ExecStart=/opt/benchmark/bin/benchmark-worker
+ExecStart=/opt/benchmark/bin/benchmark-worker.sh
 WorkingDirectory=/opt/benchmark
 RestartSec=1s
 Restart=on-failure
