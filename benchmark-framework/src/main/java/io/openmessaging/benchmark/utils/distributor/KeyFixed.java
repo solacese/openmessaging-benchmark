@@ -18,26 +18,15 @@
  */
 package io.openmessaging.benchmark.utils.distributor;
 
-import com.fasterxml.jackson.annotation.JsonEnumDefaultValue;
+import javax.annotation.concurrent.NotThreadSafe;
 
-public enum KeyDistributorType {
-    @JsonEnumDefaultValue
-    /**
-     * Key distributor that returns null keys to have default publish semantics
-     */
-    NO_KEY,
+@NotThreadSafe
+public class KeyFixed extends KeyDistributor {
 
-    /**
-     * Genarate a finite number of "keys" and cycle through them in round-robin fashion
-     */
-    KEY_ROUND_ROBIN,
+    private int currentIndex = 0;
 
-    /**
-     * Random distribution based on System.nanoTime()
-     */
-    RANDOM_NANO,
-    /**
-     * Always deliver on the same 7 Byte string key
-     */
-    FIXED_KEY
+    @Override
+    public String next() {
+        return get(currentIndex);
+    }
 }
