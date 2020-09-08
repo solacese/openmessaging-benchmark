@@ -61,6 +61,9 @@ public abstract class KeyDistributor {
             case RANDOM_NANO:
                 keyDistributor = new RandomNano();
                 break;
+            case FIXED_KEY:
+                keyDistributor = new KeyFixed();
+                break;
         }
         return keyDistributor;
     }
