@@ -1,0 +1,207 @@
+---
+#####################################################
+# Enable SWAP and install Docker CE on ALL brokers
+#####################################################
+- hosts: sol_brokers
+  become: true
+  tasks:
+    - include_role: 
+        name: centos/aws-swap-bootstrap
+      vars: 
+        swap_file_size: 2048
+    - include_role: 
+        name: centos/docker_ce
+      vars:
+        docker_centos_users: ["centos"]
+        docker_centos_version: 19.03.5
+        docker_centos_state: started
+        docker_centos_enabled: true
+        docker_centos_daemon_config:
+          storage-driver: overlay2
+          selinux-enabled: true
+          live-restore: true
+        #          log-driver: syslog
+          icc: false
+          userland-proxy: false
+
+#####################################################
+# Format, Partition External Disk, and prepare for Broker Usage - On Messaging nodes
+#####################################################
+- hosts: ha_sol_primary_nodes:ha_sol_backup_nodes
+  become: true
+  tasks:
+    - include_role: 
+        name: solace/solace-exstorage-bootstrap
+      vars:
+        # AWS M5 Instances
+        solace_mount_dev: /dev/nvme1n1 
+        solace_storage_part: /dev/nvme1n1p1
+        solace_os_user: solace
+        solace_os_user_id: 4000
+        solace_mount_path: /vmr
+
+#####################################################
+# Format, Partition External Disk, and prepare for Broker Usage - On Monitoring node
+#####################################################
+
+- hosts: ha_sol_monitor_nodes
+  become: true # Run as Root
+  tasks:
+    - include_role: 
+        name: solace/solace-exstorage-bootstrap
+      vars:
+        # AWS T2 Instances
+        solace_mount_dev: /dev/xvdc 
+        solace_storage_part: /dev/xvdc1 
+        solace_os_user: solace
+        solace_os_user_id: 4000
+        solace_mount_path: /vmr
+
+###########################################################################################################
+# Create the Solace PubSub Docker compose file, Download the Solace Image, Load and Run it - Primary Broker
+###########################################################################################################
+- hosts: ha_sol_primary_nodes
+  become: true
+  tasks:
+    - include_role: 
+        name: solace/solace-broker
+      vars:
+        container_name: PubSubPrimaryNode
+        ha_ip_primary: "{{ groups['ha_sol_primary_privateip'][ 0 ] }}" 
+        ha_ip_backup: "{{ groups['ha_sol_backup_privateip'][ 0 ] }}"
+        ha_ip_monitor: "{{ groups['ha_sol_monitor_privateip'][ 0 ] }}"
+
+        ha_ip_mate: "{{ groups['ha_sol_backup_privateip'][ 0 ] }}"
+        ha_password: secret_ha_pwd
+        node_role: primary
+        solace_storage_rootpath: /vmr
+        username_admin: admin 
+        username_admin_password: admin
+        file_owner: centos
+        file_mode: "0666"
+        system_scaling_maxconnectioncount: 10000
+        ulimit_nofile_hard: 42192
+
+
+###########################################################################################################
+# Create the Solace PubSub Docker compose file, Download the Solace Image, Load and Run it - Backup Broker
+###########################################################################################################
+
+- hosts: ha_sol_backup_nodes
+  become: true
+  tasks:
+    - include_role: 
+        name: solace/solace-broker
+      vars:
+      #Determine the current Index on the Ansible Inventory based on the broker public IP via "groups['ha_sol_backup_nodes'].index(inventory_hostname)"
+      #And use that index to retreive corresponding private IPs for the HA_cluster
+        container_name: PubSubBackupNode
+        ha_ip_primary: "{{ groups['ha_sol_primary_privateip'][ 0 ] }}" 
+        ha_ip_backup: "{{ groups['ha_sol_backup_privateip'][ 0 ] }}"
+        ha_ip_monitor: "{{ groups['ha_sol_monitor_privateip'][ 0 ] }}"
+
+        ha_ip_mate: "{{ groups['ha_sol_primary_privateip'][ 0 ] }}"
+        ha_password: secret_ha_pwd
+        node_role: backup
+        solace_storage_rootpath: /vmr
+        username_admin: admin 
+        username_admin_password: admin
+        file_owner: centos
+        file_mode: "0666"
+        system_scaling_maxconnectioncount: 10000
+        ulimit_nofile_hard: 42192
+
+
+###########################################################################################################
+# Create the Solace PubSub Docker compose file, Download the Solace Image, Load and Run it - Monitor Broker
+###########################################################################################################
+
+- hosts: ha_sol_monitor_nodes
+  become: true
+  tasks:
+    - include_role: 
+        name: solace/solace-broker
+      vars:
+      #Determine the current Index on the Ansible Inventory based on the broker public IP via "groups['ha_sol_monitor_nodes'].index(inventory_hostname)"
+      #And use that index to retreive corresponding private IPs for the HA_cluster
+        container_name: PubSubMonitorNode
+        ha_ip_primary: "{{ groups['ha_sol_primary_privateip'][ 0 ] }}" 
+        ha_ip_backup: "{{ groups['ha_sol_backup_privateip'][ 0 ] }}"
+        ha_ip_monitor: "{{ groups['ha_sol_monitor_privateip'][ 0 ] }}"
+        ha_password: secret_ha_pwd
+        node_role: monitor
+        solace_storage_rootpath: /vmr
+        username_admin: admin 
+        username_admin_password: admin
+        file_owner: centos
+        file_mode: "0666"
+
+
+###########################################################################################################
+# Create Solace configurations for Benchmark Testing on the HA Solace Brokers
+###########################################################################################################
+- hosts: ha_sol_primary_nodes # Creation on the primary broker will get synced with HA mate
+  become: false 
+  pre_tasks:
+  - include_vars: ./benchmarkVPN-sol-brokers.yml  # Load file containing Solace configurations to be created on the Solace Brokers
+  tasks:
+# Ensure that SEMP is ready before sending any SEMP request to the broker
+    - name: Wait for SEMP to be ready
+      wait_for:
+        port: 8080 # default SEMP port
+        host: "{{ inventory_hostname }}" # Current host on the Ansible inventory
+        connect_timeout: 5
+        delay: 10
+        timeout: 300
+      delegate_to: localhost
+# Assert Master Broker, to make sure that Config-Sync is Up
+    - include_role:
+        name: solace/semp/assert-master-broker
+# Increase  the Broker Max-Spool Usage
+    - include_role:
+        name: solace/semp/update-broker-spoolsize
+# Create a VPN for Testing
+    - include_role:
+        name: solace/semp/create-msg-vpn
+# Create a Loop that creates all client Profiles defined on the Variables File
+    - name: Create Client Profiles
+      block:
+      - name: Create all defined profiles on Variables File
+        with_items: "{{ client_profiles }}"
+        include_role:
+          name: solace/semp/create-client-profile
+        vars:
+          cp: "{{ item }}"
+# Create a Loop that creates all the Client Usernames defined on the Variables File
+    - name: Create Client Usernames
+      block:
+      - name: Create Client Usernames
+        with_items: "{{ client_usernames }}"
+        include_role:
+          name: solace/semp/create-client-username
+        vars:
+          cu: "{{ item }}"
+# Create a Loop that creates all the queues defined on the Variables File
+    - name: Create Queues
+      block:
+      - name: Create all defined queues on Variables File
+        with_items: "{{ queues }}"
+        include_role:
+          name: solace/semp/create-queue
+        vars:
+          q: "{{ queue }}"
+        loop_control:
+          loop_var: queue
+# Create a Loop that creates queue subscription to the topic for each one of the queues defined on the Variables File
+    - name: Update Queues
+      block:
+      - name: Create all defined queues on Variables File
+        with_subelements:
+        - "{{ queues | selectattr('subscription_topics', 'defined') | list }}" 
+        - "subscription_topics"
+        include_role:
+          name: solace/semp/create-queue-subscription
+        vars:
+          q: "{{ item.0.queueName }}"
+          subscriptionTopic: "{{ item.1 }}"
+
