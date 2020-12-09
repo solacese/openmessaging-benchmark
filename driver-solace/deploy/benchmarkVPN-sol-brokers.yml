@@ -1,0 +1,111 @@
+#####################################################
+# Config variables SEMP calls
+#####################################################
+semp_admin_user: admin
+semp_admin_password: admin
+
+#####################################################
+# Broker Max Spool
+#####################################################
+max_spool_usage: 100000
+
+#####################################################
+# config variables for creating the VPN
+#####################################################
+#Message VPN params
+vpn:
+  vpn_name: "benchmark"
+  maxMsgSpoolUsage: 100000
+  authenticationBasicType: "none"
+  serviceMqttMaxConnectionCount: 200000
+  serviceMqttPlainTextEnabled: "true"
+  serviceMqttPlainTextListenPort:  1884 
+
+#####################################################
+# config variables for creating the ClientProfile
+#####################################################
+client_profiles:
+- clientProfileName: "testCP"
+  allowGuaranteedMsgSendEnabled: "true"
+  allowGuaranteedMsgReceiveEnabled: "true"
+  allowTransactedSessionsEnabled: "false"
+  allowSharedSubscriptionsEnabled: "true"
+  maxConnectionCountPerClientUsername: 200000
+  serviceSmfMaxConnectionCountPerClientUsername: 10000
+  serviceWebMaxConnectionCountPerClientUsername: 200000
+  allowBridgeConnectionsEnabled: "false"
+  allowGuaranteedEndpointCreateEnabled: "false"
+  maxEndpointCountPerClientUsername: 10000
+  maxEgressFlowCount: 10000
+  maxIngressFlowCount: 10000
+  apiQueueManagementCopyFromOnCreateName: ""
+  apiTopicEndpointManagementCopyFromOnCreateName: ""
+  maxSubscriptionCount: 10000
+  maxTransactedSessionCount: 10
+  maxTransactionCount: 10
+- clientProfileName: "benchmarkCP"
+  allowGuaranteedMsgSendEnabled: "true"
+  allowGuaranteedMsgReceiveEnabled: "true"
+  allowTransactedSessionsEnabled: "false"
+  allowSharedSubscriptionsEnabled: "true"
+  maxConnectionCountPerClientUsername: 200000
+  serviceSmfMaxConnectionCountPerClientUsername: 10000
+  serviceWebMaxConnectionCountPerClientUsername: 200000
+  allowBridgeConnectionsEnabled: "false"
+  allowGuaranteedEndpointCreateEnabled: "false"
+  maxEndpointCountPerClientUsername: 10000
+  maxEgressFlowCount: 10000
+  maxIngressFlowCount: 10000
+  apiQueueManagementCopyFromOnCreateName: ""
+  apiTopicEndpointManagementCopyFromOnCreateName: ""
+  maxSubscriptionCount: 10000
+  maxTransactedSessionCount: 10
+  maxTransactionCount: 10
+  
+
+#####################################################
+# config variables for creating the Client-Usernames
+#####################################################
+
+client_usernames:
+- username: "testUsr"
+  aclProfileName: "default"
+  clientProfileName: "testCP"
+  enabled: true
+  password: solace123
+- username: "benchmarkUsr"
+  aclProfileName: "default"
+  clientProfileName: "benchmarkCP"
+  enabled: true
+  password: solace123
+
+#####################################################
+# config variables for creating queues
+#####################################################
+# List of Queues generated from Terraform based on the number of SDKPerf Nodes 
+
+queues:
+- queueName: "benchmark_1"
+  accessType: "non-exclusive"
+  consumerAckPropagationEnabled: "true" 
+  egressEnabled: false
+  ingressEnabled: false
+  maxBindCount: 1000
+  maxMsgSize: 10000000
+  maxMsgSpoolUsage: 50000
+  permission: "delete"
+  rejectMsgToSenderOnDiscardBehavior: "never"  
+  subscription_topics:
+  - "Topic/Test"
+- queueName: "benchmark_2"
+  accessType: "non-exclusive"
+  consumerAckPropagationEnabled: "true" 
+  egressEnabled: false
+  ingressEnabled: false
+  maxBindCount: 1000
+  maxMsgSize: 10000000
+  maxMsgSpoolUsage: 50000
+  permission: "delete"
+  rejectMsgToSenderOnDiscardBehavior: "never"  
+  subscription_topics:
+  - "Topic/Test"

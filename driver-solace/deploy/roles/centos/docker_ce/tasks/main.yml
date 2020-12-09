@@ -1,0 +1,51 @@
+---
+# tasks file for docker_ce_centos
+# https://docs.docker.com/engine/installation/linux/centos/
+
+- name: install required packages
+  yum:
+    name:
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+    update_cache: true
+- name: add repository
+  get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+- name: install docker
+  yum:
+    name:
+      - docker-ce{{ (docker_centos_version == "latest") | ternary('', "-{}".format(docker_centos_version))}}
+      - docker-ce-cli{{ (docker_centos_version == "latest") | ternary('', "-{}".format(docker_centos_version))}}
+      - containerd.io
+    update_cache: true
+- name: mkdir /etc/docker
+  file:
+    dest: /etc/docker
+    state: directory
+- name: configure docker daemon
+  template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+- name: change the status of the docker daemon
+  service:
+    name: docker
+    state: "{{ docker_centos_state }}"
+  when: docker_centos_state is defined
+- name: make docker daemon enabled or disabled
+  service:
+    name: docker
+    enabled: "{{ docker_centos_enabled }}"
+  when: docker_centos_enabled is defined
+- name: add users to the docker group
+  user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  with_items: "{{ docker_centos_users }}"
+- name: Install docker-compose
+  get_url: 
+    url : https://github.com/docker/compose/releases/download/1.25.4/docker-compose-{{ ansible_system }}-{{ ansible_userspace_architecture }}
+    dest: /usr/local/bin/docker-compose
+    mode: 'u=rwx,g=rx,o=rx'

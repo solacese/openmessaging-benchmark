@@ -1,0 +1,51 @@
+---
+- name: Download Solace Enterprise EVAL Docker Image
+  get_url: 
+    url : https://products.solace.com/download/PUBSUB_DOCKER_EVAL
+    dest: /home/centos/PUBSUB_DOCKER_EVAL
+    mode: 'u=rwx,g=rx,o=rx'
+
+- name: Load Solace Docker Image
+  command: docker load -i /home/centos/PUBSUB_DOCKER_EVAL
+  register: dockerLoadOut
+
+- debug: msg="{{dockerLoadOut.stdout_lines[0]}}"
+
+- name: find out Solace version 
+  set_fact:
+    solaceImage: "{{ dockerLoadOut.stdout_lines[0].split(' ')[2] }}"
+
+- debug: msg="{{solaceImage}}"
+
+- name: Parse & copy docker-compose template to Primary broker node
+  template:
+    src: PubSub_messagingNode_template.yml
+    dest: ./PubSub_{{ node_role }}Node.yml
+    owner: "{{ file_owner }}"
+    mode: "{{ file_mode }}"
+  vars:
+    solace_image_name : "{{ solaceImage }}"
+  when: node_role == "primary"
+
+- name: Parse & copy docker-compose template to Bakcup broker node
+  template:
+    src: PubSub_messagingNode_template.yml
+    dest: ./PubSub_{{ node_role }}Node.yml
+    owner: "{{ file_owner }}"
+    mode: "{{ file_mode }}"
+  vars:
+    solace_image_name : "{{ solaceImage }}"    
+  when: node_role == "backup"
+
+- name: Parse & copy docker-compose template to Monitor broker node
+  template:
+    src: PubSub_{{ node_role }}Node_template.yml
+    dest: ./PubSub_{{ node_role }}Node.yml
+    owner: "{{ file_owner }}"
+    mode: "{{ file_mode }}"
+  vars:
+    solace_image_name : "{{ solaceImage }}"    
+  when: node_role == "monitor"
+
+- name: Start 'er up
+  command: /usr/local/bin/docker-compose -f ./PubSub_{{ node_role }}Node.yml up -d
