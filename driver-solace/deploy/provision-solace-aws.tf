@@ -368,6 +368,12 @@ resource "aws_instance" "client" {
   count                  = "${var.num_instances["client"]}"
   monitoring             = true
 
+  root_block_device {
+    volume_type           = "gp2"
+    volume_size           = 8
+    delete_on_termination = true
+  }
+
   tags = {
     Name = "solace-client-${count.index}"
     Owner = "${var.ownerTag}"
@@ -383,6 +389,12 @@ resource "aws_instance" "prometheus" {
   subnet_id              = "${aws_subnet.benchmark_subnet_1.id}"
   vpc_security_group_ids = ["${aws_security_group.benchmark_security_group_client.id}"]
   count                  = "${var.num_instances["prometheus"]}"
+
+  root_block_device {
+    volume_type           = "gp2"
+    volume_size           = 8
+    delete_on_termination = true
+  }
 
   tags = {
     Name = "solace-prometheus-${count.index}"
