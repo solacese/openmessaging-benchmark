@@ -21,31 +21,34 @@ import io.openmessaging.benchmark.driver.BenchmarkDriver;
 import io.openmessaging.benchmark.driver.BenchmarkProducer;
 import io.openmessaging.benchmark.driver.ConsumerCallback;
 
+/**
+ * Implementation of the OpenMessaging benchmark API for the [Solace PubSub+]{@link https://www.solace.com} event broker.
+ * 
+ * @author ush.shukla@solace.com
+ *
+ */
 public class SolaceBenchmarkDriver implements BenchmarkDriver {
 
 	private final JCSMPProperties properties = new JCSMPProperties();
 
-	private List<BenchmarkProducer> producers = Collections.synchronizedList(new ArrayList<>());
-	private List<BenchmarkConsumer> consumers = Collections.synchronizedList(new ArrayList<>());
+	private List<BenchmarkProducer> publishers = Collections.synchronizedList(new ArrayList<>()); //list of all publishers currently sending messages
+	private List<BenchmarkConsumer> subscribers = Collections.synchronizedList(new ArrayList<>()); //list of all subscribers currently receiving messages
 
-	private static final ObjectMapper mapper = new ObjectMapper(new YAMLFactory()) //for parsing properties YAML
+	private static final ObjectMapper mapper = new ObjectMapper(new YAMLFactory()) // for parsing properties YAML
 			.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-	
-	
 	/**
 	 * Sets the {@link JCSMPProperties} for use by the various publisher (producer)
 	 * & consumer (subscriber) sessions used during benchmarking.
 	 * 
-	 * <u>YAML Format</u>
-	 * <code>
+	 * <u>YAML Format</u> <code>
 	 * - host: $host:$port
 	 * - vpn: $vpn
 	 * - username: $username
 	 * - password: $password
 	 * </code>
 	 * 
-	 * @param configurationFile Broker config file in YAML format
+	 * @param configurationFile broker config file in YAML format
 	 * @param statsLogger
 	 */
 
@@ -56,7 +59,7 @@ public class SolaceBenchmarkDriver implements BenchmarkDriver {
 
 		// properties
 		properties.setProperty(JCSMPProperties.HOST, config.host); // host:port
-		properties.setProperty(JCSMPProperties.USERNAME, config.username); // client-username
+		properties.setProperty(JCSMPProperties.USERNAME, config.username); // username
 		properties.setProperty(JCSMPProperties.VPN_NAME, config.vpn); // message-vpn
 		properties.setProperty(JCSMPProperties.PASSWORD, config.password); // password
 	}
@@ -73,7 +76,7 @@ public class SolaceBenchmarkDriver implements BenchmarkDriver {
 	/**
 	 * Returns a prefix for benchmarking topics.
 	 * 
-	 * @return a prefix prepended to benchmarking topics
+	 * @return a prefix prepended to topics used for benchmarking.
 	 */
 	@Override
 	public String getTopicNamePrefix() {
@@ -109,13 +112,19 @@ public class SolaceBenchmarkDriver implements BenchmarkDriver {
 		return null;
 	}
 
+	/**
+	 * Asynchronously creates a publisher instance for sending messages to a given
+	 * topic.
+	 * 
+	 * @param topic the topic to publish to.
+	 */
 	@Override
 	public CompletableFuture<BenchmarkProducer> createProducer(String topic) {
 
 		SolaceBenchmarkProducer benchmarkProducer = new SolaceBenchmarkProducer(properties, topic);
 
 		try {
-			producers.add(benchmarkProducer);
+			publishers.add(benchmarkProducer);
 			return CompletableFuture.completedFuture(benchmarkProducer);
 		} catch (Exception e) {
 
@@ -132,11 +141,38 @@ public class SolaceBenchmarkDriver implements BenchmarkDriver {
 		}
 	}
 
+	/**
+	 * Asynchronously creates a subscriber (consumer) instance for consuming from a
+	 * benchmarking topic.
+	 * 
+	 * @param topic            the topic to subscribe to (consume messages from)
+	 * @param subscriptionName not used
+	 * @param partition        not used
+	 * @param consumerCallback the callback invoked by a subscriber once it receives
+	 *                         a message
+	 */
 	@Override
 	public CompletableFuture<BenchmarkConsumer> createConsumer(String topic, String subscriptionName,
 			Optional<Integer> partition, ConsumerCallback consumerCallback) {
-		// TODO Auto-generated method stub
-		return null;
+
+		SolaceBenchmarkConsumer benchmarkConsumer = new SolaceBenchmarkConsumer(properties, topic, consumerCallback);
+
+		try {
+			subscribers.add(benchmarkConsumer);
+			return CompletableFuture.completedFuture(benchmarkConsumer);
+		} catch (Exception e) {
+
+			try {
+				benchmarkConsumer.close();
+			} catch (Exception ex) {
+				// TODO: exception handling
+			}
+
+			CompletableFuture<BenchmarkConsumer> future = new CompletableFuture<>();
+			future.completeExceptionally(e);
+
+			return future;
+		}
 	}
 
 	/**
@@ -145,10 +181,10 @@ public class SolaceBenchmarkDriver implements BenchmarkDriver {
 	@Override
 	public void close() throws Exception {
 
-		for (BenchmarkProducer producer : producers)
+		for (BenchmarkProducer producer : publishers)
 			producer.close();
 
-		for (BenchmarkConsumer consumer : consumers)
+		for (BenchmarkConsumer consumer : subscribers)
 			consumer.close();
 	}
 }

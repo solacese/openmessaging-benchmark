@@ -23,6 +23,7 @@ public class SolaceBenchmarkConsumer implements BenchmarkConsumer {
 	private JCSMPSession session;
 	private XMLMessageConsumer consumer;
 	private Topic topic;
+	private boolean closed;
 
 	public SolaceBenchmarkConsumer(JCSMPProperties properties, String topic, ConsumerCallback callback) {
 
@@ -46,6 +47,12 @@ public class SolaceBenchmarkConsumer implements BenchmarkConsumer {
 			});
 
 			this.topic = JCSMPFactory.onlyInstance().createTopic(topic);
+			session.addSubscription(this.topic);
+			consumer.start();
+
+			while (!closed) {
+				// prevent thread termination till close() is invoked.
+			}
 
 		} catch (InvalidPropertiesException ex) {
 			// TODO: Exception Handling
@@ -56,6 +63,7 @@ public class SolaceBenchmarkConsumer implements BenchmarkConsumer {
 
 	@Override
 	public void close() throws Exception {
+		this.closed = true;
 		consumer.close();
 		session.closeSession();
 	}
