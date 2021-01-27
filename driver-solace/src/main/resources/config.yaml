@@ -1,0 +1,6 @@
+---#Config values for Solace PubSub+
+host: localhost:8080
+vpn: default
+username: default
+password:
+durable: false

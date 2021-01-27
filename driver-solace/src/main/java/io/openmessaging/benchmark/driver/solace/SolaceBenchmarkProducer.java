@@ -11,6 +11,7 @@ import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
 import com.solacesystems.jcsmp.Topic;
+import com.solacesystems.jcsmp.TopicEndpoint;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
 import io.openmessaging.benchmark.driver.BenchmarkProducer;
@@ -27,33 +28,17 @@ public class SolaceBenchmarkProducer implements BenchmarkProducer {
 		try {
 			session = JCSMPFactory.onlyInstance().createSession(properties);
 			session.connect();
-			
-			producer = session.getMessageProducer(new JCSMPStreamingPublishEventHandler() {
 
-				@Override
-				public void responseReceived(String messageID) {
-					// TODO Auto-generated method stub
-
-				}
-
-				@Override
-				public void handleError(String messageID, JCSMPException cause, long timestamp) {
-					// TODO Auto-generated method stub
-
-				}
-			});
-
-			this.topic = JCSMPFactory.onlyInstance().createTopic(topic);
-			message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
-
-		} catch (InvalidPropertiesException ex) {
-			// TODO: Exception Handling
-		} catch (JCSMPException ex) {
-			// TODO : Exception Handling
-		} catch (Exception ex) {
-			// TODO : Exception Handling
+			producer = session.getMessageProducer(new SolaceDriverStreamingPublishEventHandler());
+		} catch (InvalidPropertiesException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (JCSMPException e) {
+			e.printStackTrace();
 		}
 
+		this.topic = JCSMPFactory.onlyInstance().createTopic(topic);
+		message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
 	}
 
 	@Override
@@ -70,11 +55,30 @@ public class SolaceBenchmarkProducer implements BenchmarkProducer {
 
 			try {
 				producer.send(message, topic);
-			} catch (Exception ex) {
+			} catch (JCSMPException ex) {
 				// TODO: Exception
 			}
 		});
 
 		return future;
 	}
+}
+
+/*
+ * Handler for events related to the producer
+ */
+class SolaceDriverStreamingPublishEventHandler implements JCSMPStreamingPublishEventHandler {
+
+	@Override
+	public void handleError(String arg0, JCSMPException arg1, long arg2) {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void responseReceived(String arg0) {
+		// TODO Auto-generated method stub
+
+	}
+
 }
