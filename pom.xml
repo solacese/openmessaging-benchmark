@@ -227,7 +227,7 @@
         			
         <artifactId>guava</artifactId>
         			
-        <version>23.3-jre</version>
+        <version>33.7.1-jre</version>
         		  
       </dependency>
       		
